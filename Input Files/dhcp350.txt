@@ -1,0 +1,87 @@
+# Initialize simulation
+units metal                  # Specifies units
+dimension 3                 # Set the dimensionality
+boundary p p p              # Boundary conditions
+atom_style atomic
+log log_Vac.txt
+
+# Variable setting
+variable k loop 18
+
+# Define lattice constant variable
+variable ao equal 2.7+0.006*$k
+# Set lattice parameters
+variable a equal ${ao}
+variable b equal ${ao}
+variable c equal 3.266
+variable l equal 0.99
+# Define custom lattice
+lattice custom ${ao}  &
+    a1      0.5      -0.866     0.0   &
+    a2      0.5      0.866  0.0    &
+    a3      0.0      0.0     ${c}     &
+    basis   0.0      0.0     0.0     &
+    basis   0.6667   0.3334  0.75    &
+    basis   0.0      0.0     0.5     &
+    basis   0.3334   0.6667  0.25 
+	
+
+
+# Rest of your script
+
+
+region whole block 0 10 0 10 0 10
+create_box 3 whole
+create_atoms 1 region whole
+
+
+# ... (rest of the script remains unchanged)
+
+# Set atom types and fractions
+set type 1 type/fraction 2 0.25 22345
+set type 2 type/fraction 3 0.5 22345
+
+# Define interatomic potential
+pair_style eam/alloy
+pair_coeff * * FeNiCrCoAl-heaweight.setfl Al Co Cr
+
+# Calculate properties settings
+compute csym all centro/atom fcc
+compute peratom all pe/atom
+compute eng all pe/atom
+compute eatoms all reduce sum c_eng
+
+# Equilibriate
+reset_timestep 0
+timestep 0.001
+
+velocity all create 300 50234 dist gaussian
+fix 1 all npt temp 300 300 0.1 iso 0 0 1 drag 1
+
+thermo 100
+thermo_style custom step pe lx ly lz press pxx pyy pzz c_eatoms
+
+dump 1 all custom 250 dump.three-element.dat id type x y z fx fy fz
+
+# Minimize the total energy
+min_style cg
+minimize 1e-25 1e-25 5000 10000
+
+run 0
+
+# Calculate and print simulation results
+variable natoms equal "count(all)"
+variable teng equal "c_eatoms"
+variable length equal "lx/5"
+variable ecoh equal "v_teng/v_natoms"
+
+print "Total energy (eV) = ${teng};"
+print "Number of atoms = ${natoms};"
+print "Lattice constant (Angstroms) = ${length};"
+print "Cohesive energy (eV) = ${ecoh};"
+print " ${ao} ${ecoh}" append t550dhcp5.txt
+
+# Clear and move to the next loop iteration
+clear
+next k
+jump dhcp350.txt
